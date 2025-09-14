@@ -17,8 +17,14 @@ RUN if [ -z "$GIT_CRYPT_KEY" ]; then echo "ERROR: GIT_CRYPT_KEY not provided"; e
 # Copy local code to the container image INCLUDING .git directory
 COPY . ./
 
-# Ensure .git directory exists and is properly set up
-RUN ls -la .git/ || (echo "No .git directory found" && exit 1)
+# Initialize git repository
+RUN git init .
+
+# Add all files to git (needed for git-crypt to work)
+RUN git add .
+
+# Create initial commit
+RUN git -c user.email="build@railway.com" -c user.name="Railway Build" commit -m "Initial commit" || echo "Commit failed, continuing..."
 
 # Create the key file from the build argument
 RUN echo "$GIT_CRYPT_KEY" | base64 -d > ./git-crypt-key
@@ -26,10 +32,7 @@ RUN echo "$GIT_CRYPT_KEY" | base64 -d > ./git-crypt-key
 # Debug: Check key file was created
 RUN ls -la ./git-crypt-key
 
-# Check git-crypt status before unlock
-RUN git-crypt status || echo "git-crypt status failed"
-
-# Unlock the repository using git-crypt
+# Import the git-crypt key and unlock
 RUN git-crypt unlock ./git-crypt-key
 
 # Verify unlock was successful - check if .db file is readable
